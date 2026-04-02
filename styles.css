@@ -567,39 +567,102 @@ textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(99,102,
   white-space: nowrap;
 }
 
-/* ─── Clarifications ─── */
-.clarification-list { display: flex; flex-direction: column; gap: 12px; }
+/* ─── Triage ─── */
+.triage-list { display: flex; flex-direction: column; gap: 6px; }
 
-.clarification-item {
-  padding: 16px;
-  border-radius: var(--radius-sm);
-  background: #eff6ff;
-  border: 1px solid var(--q-schedule-border);
-  animation: taskIn 0.25s ease both;
-}
-
-.clarification-task { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
-.clarification-question { font-size: 13px; color: var(--text-2); margin-bottom: 12px; }
-
-.clarification-answers {
+.triage-row {
   display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 16px;
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  animation: taskIn 0.2s ease both;
+  transition: border-color 0.2s, background 0.2s;
 }
 
-.clarification-answers button {
-  padding: 6px 12px;
+.triage-row.is-confirmed {
+  border-color: var(--q-do-border);
+  background: #f0fdf4;
+}
+
+.triage-title {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.triage-type-chip {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--text-3);
+  flex-shrink: 0;
+}
+
+.triage-toggles {
+  display: flex;
+  gap: 20px;
+  flex-shrink: 0;
+}
+
+.triage-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.triage-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-3);
+  width: 56px;
+}
+
+.triage-btn {
+  padding: 5px 14px;
   border-radius: var(--radius-xs);
   background: var(--bg-2);
-  border: 1px solid var(--border-strong);
-  color: var(--text-2);
+  border: 1px solid var(--border);
+  color: var(--text-3);
   font-size: 13px;
   font-weight: 500;
-  transition: background 0.15s, color 0.15s;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
 }
 
-.clarification-answers button:hover { background: var(--q-schedule-bg); color: var(--q-schedule-color); }
-.clarification-answers button.is-selected { background: var(--accent); border-color: transparent; color: #fff; }
+.triage-btn:hover { background: var(--surface-hover); color: var(--text-2); }
+
+.triage-btn.is-yes.is-selected {
+  background: var(--q-do-bg);
+  border-color: var(--q-do-border);
+  color: var(--q-do-color);
+}
+
+.triage-btn.is-no.is-selected {
+  background: var(--q-delete-bg);
+  border-color: var(--q-delete-border);
+  color: var(--q-delete-color);
+}
+
+.triage-btn .ki-hint {
+  font-size: 9px;
+  font-weight: 700;
+  margin-left: 3px;
+  opacity: 0.45;
+  vertical-align: super;
+}
+
+.triage-btn.is-selected .ki-hint { opacity: 0.7; }
+
+.btn-primary--sm { padding: 8px 20px; font-size: 14px; }
 
 /* ─── Count pills ─── */
 .count-pill {
@@ -805,7 +868,7 @@ textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(99,102,
 
 /* ─── Print / PDF ─── */
 @media print {
-  .topbar, .input-card, .two-col, .clarification-card,
+  .topbar, .input-card, .two-col, .triage-card,
   .special-card, .day-card, .action-row, .card-actions,
   #export-pdf, .btn-ghost, .btn-primary { display: none !important; }
 
@@ -855,6 +918,11 @@ textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(99,102,
   .two-col, .matrix-grid, .buckets-row { grid-template-columns: 1fr; }
   .capture-row { grid-template-columns: 1fr; }
   .next-step-content strong { font-size: 17px; }
+  .triage-row { flex-direction: column; align-items: stretch; gap: 8px; }
+  .triage-title { white-space: normal; }
+  .triage-toggles { gap: 12px; flex-wrap: wrap; }
+  .triage-card .card-head { flex-wrap: wrap; }
+  .triage-card .card-actions { flex-direction: column; gap: 6px; width: 100%; }
 }
 
 @media (max-width: 500px) {

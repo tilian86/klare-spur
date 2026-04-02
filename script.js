@@ -1,6 +1,5 @@
 const STORAGE_KEY = "klare-spur-state-v2";
 const MAX_AUTO_TASKS = 80;
-const MAX_CLARIFICATIONS = 3;
 const OCR_LANG = "deu+eng";
 
 const rawInput = document.querySelector("#raw-input");
@@ -16,9 +15,11 @@ const loadDemoButton = document.querySelector("#load-demo");
 const resetAppButton = document.querySelector("#reset-app");
 const useOcrTextButton = document.querySelector("#use-ocr-text");
 const dropzone = document.querySelector("#dropzone");
-const clarificationList = document.querySelector("#clarification-list");
-const clarificationCount = document.querySelector("#clarification-count");
-const clarificationSection = document.querySelector("#clarification-section");
+const triageSection = document.querySelector("#triage-section");
+const triageList = document.querySelector("#triage-list");
+const triageProgress = document.querySelector("#triage-progress");
+const triageAcceptAll = document.querySelector("#triage-accept-all");
+const triageConfirmBtn = document.querySelector("#triage-confirm");
 const buildDayButton = document.querySelector("#build-day");
 const nextStep = document.querySelector("#next-step");
 const timeline = document.querySelector("#timeline");
@@ -201,6 +202,7 @@ let state = {
     model: "",
     checked: false,
   },
+  triageConfirmed: false,
   settings: {
     dayStart: "09:00",
     availableHours: "6",
@@ -498,13 +500,6 @@ function determineQuadrant(bucket, importanceScore, urgencyScore) {
   return "delete";
 }
 
-function createClearedClarificationFlags() {
-  return {
-    action: false,
-    urgency: false,
-    importance: false,
-  };
-}
 
 function applyManualPlacement(task) {
   const placement = task.manualPlacement || "";
@@ -521,9 +516,6 @@ function applyManualPlacement(task) {
       quadrant: placement === "project" ? "schedule" : "delete",
       reasons: ["manuell verschoben", ...task.reasons].slice(0, 4),
       confidence: Math.max(task.confidence, 0.84),
-      rawNeedsClarification: false,
-      needsClarification: false,
-      clarificationFlags: createClearedClarificationFlags(),
     };
   }
 
@@ -534,9 +526,6 @@ function applyManualPlacement(task) {
     quadrant: placement,
     reasons: ["manuell verschoben", ...task.reasons].slice(0, 4),
     confidence: Math.max(task.confidence, 0.84),
-    rawNeedsClarification: false,
-    needsClarification: false,
-    clarificationFlags: createClearedClarificationFlags(),
   };
 }
 
@@ -744,38 +733,9 @@ function scoreTask(task) {
     importanceScore,
     reasons: Array.from(new Set(reasons)).slice(0, 4),
     confidence,
-    rawNeedsClarification,
-    needsClarification: false,
-    clarificationPriority:
-      (quadrant === "do" ? 4 : quadrant === "schedule" ? 3 : 1) +
-      importanceScore +
-      urgencyScore -
-      confidence * 1.6,
-    clarificationFlags: {
-      action: tooBroad || !hasClearAction,
-      urgency: urgencyScore < 2.4,
-      importance: importanceScore < 3,
-    },
   });
 }
 
-function applyClarificationLimit(tasks) {
-  const candidateIds = new Set(
-    tasks
-      .filter((task) => task.rawNeedsClarification)
-      .sort((left, right) => right.clarificationPriority - left.clarificationPriority)
-      .slice(0, MAX_CLARIFICATIONS)
-      .map((task) => task.id)
-  );
-
-  tasks.forEach((task) => {
-    task.needsClarification = candidateIds.has(task.id);
-
-    if (!task.needsClarification) {
-      task.clarificationFlags = createClearedClarificationFlags();
-    }
-  });
-}
 
 function buildTasksFromInput() {
   const combinedText = [state.rawText, state.ocrText].filter(Boolean).join("\n");
@@ -814,7 +774,6 @@ function buildTasksFromHeuristics(parsedItems) {
     const previous = existingByTitle.get(normalizeWhitespace(task.title).toLowerCase());
     return scoreTask(hydrateTaskWithPrevious(task, previous));
   });
-  applyClarificationLimit(state.tasks);
 }
 
 function applyAiDecision(baseTask, aiTask) {
@@ -841,19 +800,6 @@ function applyAiDecision(baseTask, aiTask) {
     quadrant,
     reasons: Array.from(new Set([...(aiTask.reasons || []), ...baseTask.reasons])).slice(0, 4),
     confidence: clamp(Number(aiTask.confidence || Math.round(baseTask.confidence * 100)) / 100, 0.45, 0.99),
-    rawNeedsClarification: Boolean(aiTask.follow_up_question) && !baseTask.dismissedClarification,
-    needsClarification: false,
-    clarificationPriority:
-      (quadrant === "do" ? 4 : quadrant === "schedule" ? 3 : 1) +
-      baseTask.importanceScore +
-      baseTask.urgencyScore,
-    clarificationFlags: aiTask.follow_up_question
-      ? {
-          action: true,
-          urgency: false,
-          importance: false,
-        }
-      : createClearedClarificationFlags(),
     aiDecision: aiTask,
     aiFollowUpQuestion: aiTask.follow_up_question || "",
     suggestedAction: aiTask.suggested_action || "",
@@ -870,7 +816,6 @@ function buildTasksFromAi(parsedItems, aiPayload) {
     return applyAiDecision(baseTask, byIndex.get(index));
   });
 
-  applyClarificationLimit(state.tasks);
 }
 
 async function requestAiSort(parsedItems) {
@@ -1028,7 +973,7 @@ function renderEmptyState(target, text) {
 
 function buildTaskCard(task, { special = false } = {}) {
   const card = document.createElement("article");
-  card.className = `task-card task-card--${task.bucket === "matrix" ? task.quadrant : task.bucket}${task.needsClarification ? " is-unresolved" : ""}${special ? " is-special" : ""}`;
+  card.className = `task-card task-card--${task.bucket === "matrix" ? task.quadrant : task.bucket}${special ? " is-special" : ""}`;
   const reasons = task.reasons.length
     ? task.reasons.map((reason) => `<span class="reason-chip">${escapeHtml(reason)}</span>`).join("")
     : `<span class="reason-chip">mutig vorsortiert</span>`;
@@ -1067,7 +1012,6 @@ function setManualPlacement(taskId, placement) {
 
   task.manualPlacement = placement === "auto" ? "" : placement;
   Object.assign(task, scoreTask(task));
-  applyClarificationLimit(state.tasks);
   buildTimeline();
   saveState();
   renderAll();
@@ -1137,144 +1081,123 @@ function renderSpecialBuckets() {
     }
   });
 
-  const directCount = state.tasks.filter((task) => !task.needsClarification).length;
+  const directCount = state.tasks.length;
   const routineCount = state.tasks.filter((task) => task.bucket === "routine").length;
   const projectCount = state.tasks.filter((task) => task.bucket === "project").length;
   const ideaCount = state.tasks.filter((task) => task.bucket === "idea").length;
-  const questionCount = state.tasks.filter((task) => task.needsClarification).length;
 
-  smartSummary.textContent = `${directCount} direkt sortiert, ${questionCount} Rückfragen, ${routineCount} Routinen, ${projectCount} Projekte, ${ideaCount} Ideen.`;
+  smartSummary.textContent = `${directCount} sortiert: ${routineCount} Routinen, ${projectCount} Projekte, ${ideaCount} Ideen.`;
 }
 
-function buildClarificationPrompt(task) {
-  if (task.aiFollowUpQuestion) {
-    return task.aiFollowUpQuestion;
-  }
+// ─── Triage ───
 
-  const prompts = [];
-
-  if (task.clarificationFlags.action) {
-    prompts.push("Das ist noch etwas zu breit formuliert.");
-  }
-
-  if (task.clarificationFlags.urgency) {
-    prompts.push("Mir fehlt, ob das wirklich zeitnah ziehen soll.");
-  }
-
-  if (task.clarificationFlags.importance) {
-    prompts.push("Ich brauche noch, ob Verschieben echte Nachteile hätte.");
-  }
-
-  return prompts.join(" ");
+function quadrantToTriage(task) {
+  const q = task.quadrant || "delete";
+  return {
+    urgent: q === "do" || q === "delegate",
+    important: q === "do" || q === "schedule",
+  };
 }
 
-function buildOptionButton(group, value, label, selectedValue) {
-  const selectedClass = value === selectedValue ? " is-selected" : "";
-  return `<button class="option-button${selectedClass}" type="button" data-option="${group}" data-value="${value}">${label}</button>`;
+function showTriageStep() {
+  state.triageConfirmed = false;
+  state.tasks.forEach((t) => { t.triageConfirmed = false; });
+  triageSection.hidden = false;
+  document.getElementById("results-area").hidden = true;
+  renderTriage();
+  triageSection.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
-function renderClarifications() {
-  clarificationList.innerHTML = "";
-  const unresolvedTasks = state.tasks.filter((task) => task.needsClarification);
+function renderTriage() {
+  triageList.innerHTML = "";
+  const confirmed = state.tasks.filter((t) => t.triageConfirmed).length;
+  triageProgress.textContent = `${confirmed} / ${state.tasks.length} bestätigt`;
 
-  clarificationCount.textContent = unresolvedTasks.length
-    ? `${unresolvedTasks.length} Blocker brauchen noch kurz Klarheit.`
-    : "Keine Rückfrage nötig.";
+  state.tasks.forEach((task, i) => {
+    const ai = quadrantToTriage(task);
+    const isUrgentYes = task.answers.urgency === "today" || (!task.answers.urgency && ai.urgent);
+    const isImportantYes = task.answers.importance === "high" || (!task.answers.importance && ai.important);
 
-  if (!unresolvedTasks.length) {
-    clarificationList.innerHTML = `<p class="empty-state">Die App hat erstmal mutig vorsortiert.</p>`;
-    return;
-  }
+    const row = document.createElement("article");
+    row.className = `triage-row${task.triageConfirmed ? " is-confirmed" : ""}`;
+    row.dataset.taskId = task.id;
+    row.style.animationDelay = `${i * 0.03}s`;
 
-  unresolvedTasks.forEach((task) => {
-    const item = document.createElement("article");
-    item.className = "clarification-item";
-    item.dataset.taskId = task.id;
+    const typeChip = task.bucket !== "matrix"
+      ? `<span class="triage-type-chip">${task.bucket === "routine" ? "Routine" : task.bucket === "project" ? "Projekt" : "Idee"}</span>`
+      : "";
 
-    item.innerHTML = `
-      <div class="clarification-meta">
-        <div>
-          <h3>${escapeHtml(task.title)}</h3>
-          <p>${escapeHtml(buildClarificationPrompt(task))}</p>
+    row.innerHTML = `
+      <span class="triage-title">${escapeHtml(task.title)}</span>
+      ${typeChip}
+      <div class="triage-toggles">
+        <div class="triage-group">
+          <span class="triage-label">Dringend?</span>
+          <button class="triage-btn is-yes${isUrgentYes ? " is-selected" : ""}" type="button" data-triage="urgency" data-value="yes">${!task.answers.urgency && ai.urgent ? 'Ja<span class="ki-hint">KI</span>' : "Ja"}</button>
+          <button class="triage-btn is-no${!isUrgentYes ? " is-selected" : ""}" type="button" data-triage="urgency" data-value="no">${!task.answers.urgency && !ai.urgent ? 'Nein<span class="ki-hint">KI</span>' : "Nein"}</button>
         </div>
-        <label class="field-label" for="action-${task.id}">Wenn nötig konkreter machen</label>
-        <textarea
-          class="clarify-action"
-          id="action-${task.id}"
-          rows="3"
-          placeholder="z. B. 'E-Mail an Hochschule schreiben und nach Zulassung fragen'"
-        >${escapeHtml(task.answers.action || task.suggestedAction || task.title)}</textarea>
-      </div>
-
-      <div class="clarification-meta">
-        <div>
-          <p class="field-label">Wie zeitkritisch ist es?</p>
-          <div class="option-group" data-option-group="urgency">
-            ${buildOptionButton("urgency", "today", "Heute / morgen", task.answers.urgency)}
-            ${buildOptionButton("urgency", "week", "Diese Woche", task.answers.urgency)}
-            ${buildOptionButton("urgency", "later", "Kann warten", task.answers.urgency)}
-          </div>
+        <div class="triage-group">
+          <span class="triage-label">Wichtig?</span>
+          <button class="triage-btn is-yes${isImportantYes ? " is-selected" : ""}" type="button" data-triage="importance" data-value="yes">${!task.answers.importance && ai.important ? 'Ja<span class="ki-hint">KI</span>' : "Ja"}</button>
+          <button class="triage-btn is-no${!isImportantYes ? " is-selected" : ""}" type="button" data-triage="importance" data-value="no">${!task.answers.importance && !ai.important ? 'Nein<span class="ki-hint">KI</span>' : "Nein"}</button>
         </div>
-
-        <div>
-          <p class="field-label">Wie wichtig ist es wirklich?</p>
-          <div class="option-group two" data-option-group="importance">
-            ${buildOptionButton("importance", "high", "Wichtig", task.answers.importance)}
-            ${buildOptionButton("importance", "low", "Eher optional", task.answers.importance)}
-          </div>
-        </div>
-      </div>
-
-      <div class="clarification-actions">
-        <button class="ghost-button" type="button" data-keep-task="${task.id}">
-          Erstmal so lassen
-        </button>
-        <button class="button primary-button" type="button" data-save-task="${task.id}">
-          Neu einsortieren
-        </button>
       </div>
     `;
 
-    clarificationList.append(item);
+    triageList.append(row);
   });
 }
 
-function updateTaskFromClarification(taskId, container) {
-  const task = state.tasks.find((entry) => entry.id === taskId);
-  if (!task) {
-    return;
+function applyTriageToTask(taskId, field, value) {
+  const task = state.tasks.find((t) => t.id === taskId);
+  if (!task) return;
+
+  if (field === "urgency") {
+    task.answers.urgency = value === "yes" ? "today" : "later";
+  } else if (field === "importance") {
+    task.answers.importance = value === "yes" ? "high" : "low";
   }
-
-  const actionField = container.querySelector(".clarify-action");
-  task.answers.action = normalizeWhitespace(actionField.value || "");
-  task.dismissedClarification = false;
-
-  const selectedUrgency = container.querySelector('[data-option="urgency"].is-selected');
-  task.answers.urgency = selectedUrgency?.dataset.value || "";
-  task.answers.dueWindow = task.answers.urgency;
-
-  const selectedImportance = container.querySelector('[data-option="importance"].is-selected');
-  task.answers.importance = selectedImportance?.dataset.value || "";
-
-  Object.assign(task, scoreTask(task));
-  applyClarificationLimit(state.tasks);
-  buildTimeline();
+  task.triageConfirmed = true;
   saveState();
-  renderAll();
+
+  const confirmed = state.tasks.filter((t) => t.triageConfirmed).length;
+  triageProgress.textContent = `${confirmed} / ${state.tasks.length} bestätigt`;
+
+  const row = triageList.querySelector(`[data-task-id="${taskId}"]`);
+  if (row) row.classList.add("is-confirmed");
 }
 
-function dismissClarification(taskId) {
-  const task = state.tasks.find((entry) => entry.id === taskId);
-  if (!task) {
-    return;
-  }
+function acceptAllTriageSuggestions() {
+  state.tasks.forEach((task) => {
+    if (task.triageConfirmed) return;
+    const ai = quadrantToTriage(task);
+    if (!task.answers.urgency) task.answers.urgency = ai.urgent ? "today" : "later";
+    if (!task.answers.importance) task.answers.importance = ai.important ? "high" : "low";
+    task.triageConfirmed = true;
+  });
+  saveState();
+  renderTriage();
+}
 
-  task.dismissedClarification = true;
-  Object.assign(task, scoreTask(task));
-  applyClarificationLimit(state.tasks);
+function confirmTriage() {
+  state.tasks.forEach((task) => {
+    if (!task.triageConfirmed) {
+      const ai = quadrantToTriage(task);
+      if (!task.answers.urgency) task.answers.urgency = ai.urgent ? "today" : "later";
+      if (!task.answers.importance) task.answers.importance = ai.important ? "high" : "low";
+      task.triageConfirmed = true;
+    }
+    Object.assign(task, scoreTask(task));
+  });
+
+  state.triageConfirmed = true;
   buildTimeline();
   saveState();
   renderAll();
+
+  triageSection.hidden = true;
+  document.getElementById("results-area").hidden = false;
+  document.getElementById("results-area").scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function formatTime(minutes) {
@@ -1335,17 +1258,17 @@ function buildTimeline() {
   const energyMultiplier = getEnergyMultiplier();
 
   const actionable = state.tasks
-    .filter((task) => !task.needsClarification && task.bucket === "matrix" && task.quadrant !== "delete")
+    .filter((task) => task.bucket === "matrix" && task.quadrant !== "delete")
     .slice()
     .sort((left, right) => scoreForToday(right) - scoreForToday(left));
 
   const projects = state.tasks
-    .filter((task) => !task.needsClarification && task.bucket === "project" && task.quadrant === "schedule")
+    .filter((task) => task.bucket === "project" && task.quadrant === "schedule")
     .slice()
     .sort((left, right) => scoreForToday(right) - scoreForToday(left));
 
   const routines = state.tasks
-    .filter((task) => !task.needsClarification && task.bucket === "routine")
+    .filter((task) => task.bucket === "routine")
     .slice()
     .sort((left, right) => scoreForToday(right) - scoreForToday(left));
 
@@ -1619,7 +1542,6 @@ function renderMindmap() {
 function renderAll() {
   renderMatrixTasks();
   renderSpecialBuckets();
-  renderClarifications();
   renderTimeline();
   renderMindmap();
   const resultsArea = document.getElementById("results-area");
@@ -1703,6 +1625,7 @@ function resetApp() {
       model: state.engine?.model || "",
       checked: state.engine?.checked || false,
     },
+    triageConfirmed: false,
     settings: {
       dayStart: "09:00",
       availableHours: "6",
@@ -1716,6 +1639,7 @@ function resetApp() {
   previewImage.src = "";
   previewImage.hidden = true;
   previewFrame.querySelector(".preview-empty")?.classList.remove("is-hidden");
+  triageSection.hidden = true;
   dayStartInput.value = "09:00";
   availableHoursInput.value = "6";
   energyLevelInput.value = "medium";
@@ -1762,20 +1686,14 @@ async function analyzeInput() {
       buildTasksFromHeuristics(parsedItems);
     }
 
-    buildTimeline();
     saveState();
-    renderAll();
-
-    const matrixCount = state.tasks.filter((task) => task.bucket === "matrix").length;
-    const specialCount = state.tasks.filter((task) => task.bucket !== "matrix").length;
-    const unresolvedCount = state.tasks.filter((task) => task.needsClarification).length;
+    showTriageStep();
 
     const engineLabel = aiPayload?.tasks?.length
-      ? `OpenAI${state.engine.model ? ` (${state.engine.model})` : ""}`
+      ? `Claude${state.engine.model ? ` (${state.engine.model})` : ""}`
       : "Fallback";
 
-    setStatus(`${engineLabel}: ${matrixCount} Aufgaben in der Matrix, ${specialCount} separat einsortiert, ${unresolvedCount} Rückfragen.`);
-    clarificationSection?.scrollIntoView({ behavior: "smooth", block: "start" });
+    setStatus(`${engineLabel}: ${state.tasks.length} Aufgaben erkannt. Bitte kurz bestätigen: Dringend? Wichtig?`);
   } catch (error) {
     console.error(error);
     setStatus("Beim Sortieren ist ein Fehler passiert. Bitte Seite neu laden oder nochmal versuchen.");
@@ -1796,6 +1714,12 @@ function restoreUi() {
     previewImage.src = state.screenshotDataUrl;
     previewImage.hidden = false;
     previewFrame.querySelector(".preview-empty")?.classList.add("is-hidden");
+  }
+
+  if (state.tasks.length > 0 && state.triageConfirmed) {
+    renderAll();
+  } else if (state.tasks.length > 0 && !state.triageConfirmed) {
+    showTriageStep();
   }
 }
 
@@ -1818,10 +1742,10 @@ function migrateStoredTasks() {
       },
       dismissedClarification: Boolean(task.dismissedClarification),
       manualPlacement: task.manualPlacement || "",
+      triageConfirmed: Boolean(task.triageConfirmed),
     })
   );
 
-  applyClarificationLimit(state.tasks);
   buildTimeline();
   saveState();
 }
@@ -1938,29 +1862,25 @@ document.addEventListener("change", (event) => {
   setStatus(select.value === "auto" ? "Automatische Sortierung wieder aktiv." : "Aufgabe manuell verschoben.");
 });
 
-clarificationList.addEventListener("click", (event) => {
-  const optionButton = event.target.closest("[data-option]");
-  if (optionButton) {
-    const parent = optionButton.closest("[data-option-group]");
-    parent?.querySelectorAll("[data-option]").forEach((button) => button.classList.remove("is-selected"));
-    optionButton.classList.add("is-selected");
-    return;
-  }
+triageList.addEventListener("click", (event) => {
+  const btn = event.target.closest(".triage-btn");
+  if (!btn) return;
 
-  const keepButton = event.target.closest("[data-keep-task]");
-  if (keepButton) {
-    dismissClarification(keepButton.dataset.keepTask);
-    setStatus("Aufgabe erstmal so gelassen.");
-    return;
-  }
+  const row = btn.closest(".triage-row");
+  const taskId = row?.dataset.taskId;
+  const field = btn.dataset.triage;
+  const value = btn.dataset.value;
+  if (!taskId || !field) return;
 
-  const saveButton = event.target.closest("[data-save-task]");
-  if (saveButton) {
-    const container = saveButton.closest(".clarification-item");
-    updateTaskFromClarification(saveButton.dataset.saveTask, container);
-    setStatus("Aufgabe neu einsortiert.");
-  }
+  const group = btn.closest(".triage-group");
+  group?.querySelectorAll(".triage-btn").forEach((b) => b.classList.remove("is-selected"));
+  btn.classList.add("is-selected");
+
+  applyTriageToTask(taskId, field, value);
 });
+
+triageAcceptAll?.addEventListener("click", acceptAllTriageSuggestions);
+triageConfirmBtn?.addEventListener("click", confirmTriage);
 
 rawInput.addEventListener("input", () => {
   state.rawText = rawInput.value;

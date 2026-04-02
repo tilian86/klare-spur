@@ -41,7 +41,7 @@
           <ol class="help-steps">
             <li><span class="help-num">1</span><div><strong>Brain Dump</strong> — alles reinschreiben was dir im Kopf rumgeistert. Kommas, Zeilenumbrüche, egal.</div></li>
             <li><span class="help-num">2</span><div><strong>Screenshot</strong> — optional: Kalender, Notiz, Foto einer Handschrift einfügen. Der Text wird automatisch erkannt.</div></li>
-            <li><span class="help-num">3</span><div><strong>Aufgaben sortieren</strong> — Claude KI sortiert alles in die <em>Eisenhower-Matrix</em>: Sofort / Einplanen / Delegieren / Parken.</div></li>
+            <li><span class="help-num">3</span><div><strong>Quick Triage</strong> — für jede Aufgabe bestätigst du: Dringend? Wichtig? Die KI schlägt vor, du entscheidest.</div></li>
             <li><span class="help-num">4</span><div><strong>Mindmap</strong> — interaktive Übersicht aller Aufgaben. Ziehen, zoomen, als PDF exportieren.</div></li>
             <li><span class="help-num">5</span><div><strong>Tagesstruktur</strong> — automatischer Zeitplan basierend auf deiner Energie und den verfügbaren Stunden.</div></li>
           </ol>
@@ -144,6 +144,24 @@
           </section>
         </div>
 
+        <!-- Quick Triage -->
+        <section class="card triage-card" id="triage-section" hidden>
+          <div class="card-head">
+            <span class="step-badge">2</span>
+            <div class="card-head-text">
+              <h3>Quick Triage <button class="tip-btn" data-tip="Bestätige für jede Aufgabe: Ist sie dringend? Ist sie wichtig? Die KI hat Vorschläge gemacht (markiert mit KI), du kannst sie mit einem Klick ändern.">?</button></h3>
+              <p class="card-sub" id="triage-progress">0 / 0 bestätigt</p>
+            </div>
+            <div class="card-actions">
+              <button class="btn-ghost" type="button" id="triage-accept-all">Alle KI-Vorschläge übernehmen</button>
+              <button class="btn-primary btn-primary--sm" type="button" id="triage-confirm">
+                Weiter zur Matrix
+              </button>
+            </div>
+          </div>
+          <div id="triage-list" class="triage-list"></div>
+        </section>
+
         <!-- Results (revealed after analysis) -->
         <div id="results-area" class="results-area" hidden>
 
@@ -169,21 +187,6 @@
               </button>
             </div>
             <div id="mindmap-container" class="mindmap-container"></div>
-          </section>
-
-          <!-- Rückfragen -->
-          <section class="card clarification-card" id="clarification-section">
-            <div class="card-head">
-              <span class="step-badge step-badge--q">?</span>
-              <div class="card-head-text">
-                <h3>Rückfragen <button class="tip-btn" data-tip="Die KI stellt maximal 3 Rückfragen, wenn eine Aufgabe nicht eindeutig einzuordnen ist — z.B. ob etwas dringend oder nur wichtig ist.">?</button></h3>
-                <p class="card-sub">Nur echte Blocker — maximal drei.</p>
-              </div>
-              <span id="clarification-count" class="count-pill">0</span>
-            </div>
-            <div id="clarification-list" class="clarification-list">
-              <p class="empty-hint">Keine Rückfragen — alles klar einordenbar.</p>
-            </div>
           </section>
 
           <!-- Eisenhower Matrix -->
