@@ -794,6 +794,8 @@ textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(99,102,
   border: 1px solid var(--border);
 }
 
+.mindmap-container .map-container { overflow: visible !important; }
+
 /* mind-elixir light theme overrides */
 #mindmap-container me-root { fill: var(--accent) !important; }
 #mindmap-container me-wrapper { background: #fafbff !important; }

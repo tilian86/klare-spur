@@ -1529,14 +1529,14 @@ function buildMindmapData() {
     }
   });
 
-  const matrixChildren = ["do", "schedule", "delegate", "delete"].map((q) => ({
-    topic: QUADRANT_LABELS[q].topic,
-    id: `q-${q}`,
-    style: QUADRANT_LABELS[q].style,
-    children: bucketNodes[q].length
-      ? bucketNodes[q]
-      : [{ topic: "—", id: `q-${q}-empty`, style: { color: "#4a5568", fontSize: "12px" } }],
-  }));
+  const matrixChildren = ["do", "schedule", "delegate", "delete"]
+    .filter((q) => bucketNodes[q].length > 0)
+    .map((q) => ({
+      topic: QUADRANT_LABELS[q].topic,
+      id: `q-${q}`,
+      style: QUADRANT_LABELS[q].style,
+      children: bucketNodes[q],
+    }));
 
   const specialChildren = [
     { key: "routine", label: "🟢 Routinen",   color: "#059669" },
