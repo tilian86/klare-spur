@@ -1882,6 +1882,16 @@ triageList.addEventListener("click", (event) => {
 triageAcceptAll?.addEventListener("click", acceptAllTriageSuggestions);
 triageConfirmBtn?.addEventListener("click", confirmTriage);
 
+const welcomeBanner = document.querySelector("#welcome-banner");
+const dismissWelcome = document.querySelector("#dismiss-welcome");
+if (localStorage.getItem("klare-spur-welcomed")) {
+  welcomeBanner.hidden = true;
+}
+dismissWelcome?.addEventListener("click", () => {
+  welcomeBanner.hidden = true;
+  localStorage.setItem("klare-spur-welcomed", "1");
+});
+
 rawInput.addEventListener("input", () => {
   state.rawText = rawInput.value;
   saveState();
