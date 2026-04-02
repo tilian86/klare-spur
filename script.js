@@ -1505,7 +1505,7 @@ function renderMindmap() {
 
   if (mindElixirInstance) {
     mindElixirInstance.refresh(data);
-    setTimeout(() => mindElixirInstance.toCenter(), 100);
+    setTimeout(() => { try { mindElixirInstance.toCenter(); } catch(e) {} }, 300);
     return;
   }
 
@@ -1519,6 +1519,7 @@ function renderMindmap() {
     toolBar: false,
     nodeMenu: false,
     keypress: false,
+    autoFit: true,
     theme: {
       name: "light",
       palette: ["#6366f1","#16a34a","#3b82f6","#f59e0b","#8b5cf6","#ec4899","#64748b"],
@@ -1536,7 +1537,7 @@ function renderMindmap() {
   });
 
   mindElixirInstance.init(data);
-  setTimeout(() => mindElixirInstance.toCenter(), 100);
+  setTimeout(() => { try { mindElixirInstance.toCenter(); } catch(e) {} }, 300);
 }
 
 function renderAll() {
