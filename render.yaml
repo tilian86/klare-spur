@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: klare-spur
+    runtime: python
+    buildCommand: echo "no build needed"
+    startCommand: python3 server.py
+    envVars:
+      - key: HOST
+        value: "0.0.0.0"
+      - key: ANTHROPIC_API_KEY
+        sync: false

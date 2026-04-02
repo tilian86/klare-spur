@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Klare Spur</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./styles.css" />
+    <script defer src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <link rel="stylesheet" href="./mind-elixir.css" />
+    <script src="./mind-elixir.js"></script>
+    <script defer src="./script.js"></script>
+  </head>
+  <body>
+    <div class="app">
+
+      <!-- Topbar -->
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand-glyph">◈</span>
+          <span class="brand-name">Klare Spur</span>
+        </div>
+        <div class="topbar-right">
+          <div class="engine-banner" id="engine-banner" aria-live="polite">
+            <span class="engine-dot"></span>
+            <span id="engine-badge">Verbinde …</span>
+          </div>
+          <button class="btn-help" id="help-btn" type="button" aria-label="Hilfe">?</button>
+        </div>
+      </header>
+
+      <!-- Help Modal -->
+      <div class="help-overlay" id="help-overlay" hidden>
+        <div class="help-modal">
+          <div class="help-modal-head">
+            <strong>Wie funktioniert Klare Spur?</strong>
+            <button class="btn-help-close" id="help-close" type="button">✕</button>
+          </div>
+          <ol class="help-steps">
+            <li><span class="help-num">1</span><div><strong>Brain Dump</strong> — alles reinschreiben was dir im Kopf rumgeistert. Kommas, Zeilenumbrüche, egal.</div></li>
+            <li><span class="help-num">2</span><div><strong>Screenshot</strong> — optional: Kalender, Notiz, Foto einer Handschrift einfügen. Der Text wird automatisch erkannt.</div></li>
+            <li><span class="help-num">3</span><div><strong>Aufgaben sortieren</strong> — Claude KI sortiert alles in die <em>Eisenhower-Matrix</em>: Sofort / Einplanen / Delegieren / Parken.</div></li>
+            <li><span class="help-num">4</span><div><strong>Mindmap</strong> — interaktive Übersicht aller Aufgaben. Ziehen, zoomen, als PDF exportieren.</div></li>
+            <li><span class="help-num">5</span><div><strong>Tagesstruktur</strong> — automatischer Zeitplan basierend auf deiner Energie und den verfügbaren Stunden.</div></li>
+          </ol>
+          <p class="help-tip">💡 <strong>Tipp:</strong> Quadrant-Zuordnungen lassen sich per Dropdown manuell überschreiben.</p>
+        </div>
+      </div>
+
+      <main class="workspace">
+
+        <!-- 1. Brain Dump -->
+        <section class="card input-card">
+          <div class="card-head">
+            <span class="step-badge">1</span>
+            <div class="card-head-text">
+              <h2>Brain Dump <button class="tip-btn" data-tip="Schreib alles auf, was dir im Kopf rumgeht — ohne Reihenfolge, ohne Bewertung. Die KI sortiert danach.">?</button></h2>
+              <p class="card-sub">Alles rein — ungefiltert, egal wie chaotisch.</p>
+            </div>
+            <div class="card-actions">
+              <button class="btn-ghost" type="button" id="load-demo">Demo laden</button>
+              <button class="btn-ghost btn-danger" type="button" id="reset-app">Leeren</button>
+            </div>
+          </div>
+
+          <textarea
+            id="raw-input"
+            class="raw-input"
+            placeholder="z. B.  Rechnung zahlen · Mail an Anna · Arzttermin · Steuerunterlagen suchen · daily · 20 min Sport …"
+          ></textarea>
+
+          <div class="capture-row">
+            <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-describedby="dropzone-hint">
+              <div class="dropzone-icon">⌅</div>
+              <p class="dropzone-title">Screenshot einfügen</p>
+              <p class="dropzone-hint" id="dropzone-hint">Reinziehen, ⌘V oder Datei auswählen</p>
+              <label class="btn-outline upload-btn">
+                Bild auswählen
+                <input type="file" id="image-input" accept="image/*" />
+              </label>
+            </div>
+
+            <div class="preview-wrap">
+              <div class="preview-head">
+                <span class="label-xs">Screenshot-Vorschau</span>
+                <button class="btn-text" type="button" id="clear-image">Entfernen</button>
+              </div>
+              <div class="preview-frame" id="preview-frame">
+                <p class="empty-hint">Kein Screenshot eingefügt</p>
+                <img id="preview-image" alt="Vorschau" hidden />
+              </div>
+            </div>
+          </div>
+
+          <div class="action-row">
+            <button class="btn-primary" type="button" id="analyze-button">
+              <span class="btn-icon">◈</span>
+              Aufgaben sortieren
+            </button>
+            <p class="status-text" id="processing-status">Bereit für Text oder Screenshot.</p>
+          </div>
+        </section>
+
+        <!-- 2. Settings + OCR -->
+        <div class="two-col">
+          <section class="card settings-card">
+            <div class="card-head compact">
+              <span class="step-badge">2</span>
+              <div class="card-head-text">
+                <h3>Tagesrahmen <button class="tip-btn" data-tip="Lege fest, wann dein Tag startet, wie viele Stunden du hast und wie dein Energielevel ist. Das beeinflusst den automatischen Tagesplan.">?</button></h3>
+              </div>
+            </div>
+            <div class="settings-row">
+              <label class="field">
+                <span class="field-label">Start <button class="tip-btn tip-btn--sm" data-tip="Wann beginnt dein Arbeitstag? Der Tagesplan startet ab dieser Uhrzeit.">?</button></span>
+                <input type="time" id="day-start" value="09:00" />
+              </label>
+              <label class="field">
+                <span class="field-label">Stunden <button class="tip-btn tip-btn--sm" data-tip="Wie viele Stunden hast du heute produktiv zur Verfügung?">?</button></span>
+                <input type="number" id="available-hours" min="1" max="12" step="0.5" value="6" />
+              </label>
+              <label class="field">
+                <span class="field-label">Energie <button class="tip-btn tip-btn--sm" data-tip="Dein Energielevel bestimmt, wie viele Pausen eingeplant werden und wie lang die Arbeitsblöcke sind.">?</button></span>
+                <select id="energy-level">
+                  <option value="low">Niedrig</option>
+                  <option value="medium" selected>Mittel</option>
+                  <option value="high">Hoch</option>
+                </select>
+              </label>
+            </div>
+          </section>
+
+          <section class="card ocr-card">
+            <div class="card-head compact">
+              <span class="step-badge step-badge--ocr">OCR</span>
+              <div class="card-head-text">
+                <h3>Erkannter Text <button class="tip-btn" data-tip="OCR (Texterkennung) liest Text aus Bildern. Füge einen Screenshot ein und der Text wird automatisch extrahiert und kann zur Sortierung übernommen werden.">?</button></h3>
+              </div>
+              <button class="btn-ghost" type="button" id="use-ocr-text">In Inbox übernehmen</button>
+            </div>
+            <textarea id="ocr-output" class="ocr-output" placeholder="Text aus Screenshot erscheint hier …"></textarea>
+          </section>
+        </div>
+
+        <!-- Results (revealed after analysis) -->
+        <div id="results-area" class="results-area" hidden>
+
+          <!-- Nächster Schritt — Hero -->
+          <section class="card next-step-card">
+            <p class="next-step-label">Nächster Schritt <button class="tip-btn tip-btn--sm" data-tip="Die wichtigste Aufgabe, mit der du jetzt starten solltest. Wird automatisch aus der Priorisierung abgeleitet.">?</button></p>
+            <div id="next-step" class="next-step-content">
+              <strong>Warte auf Input.</strong>
+            </div>
+            <div id="timeline" class="timeline"></div>
+          </section>
+
+          <!-- Mindmap -->
+          <section class="card mindmap-card">
+            <div class="card-head">
+              <span class="step-badge">◈</span>
+              <div class="card-head-text">
+                <h3>Mindmap <button class="tip-btn" data-tip="Interaktive Übersicht aller Aufgaben. Du kannst Knoten ziehen, zoomen und die Ansicht als PDF exportieren.">?</button></h3>
+                <p class="card-sub">Alle Aufgaben als interaktive Übersicht</p>
+              </div>
+              <button class="btn-ghost" type="button" id="export-pdf">
+                Als PDF exportieren
+              </button>
+            </div>
+            <div id="mindmap-container" class="mindmap-container"></div>
+          </section>
+
+          <!-- Rückfragen -->
+          <section class="card clarification-card" id="clarification-section">
+            <div class="card-head">
+              <span class="step-badge step-badge--q">?</span>
+              <div class="card-head-text">
+                <h3>Rückfragen <button class="tip-btn" data-tip="Die KI stellt maximal 3 Rückfragen, wenn eine Aufgabe nicht eindeutig einzuordnen ist — z.B. ob etwas dringend oder nur wichtig ist.">?</button></h3>
+                <p class="card-sub">Nur echte Blocker — maximal drei.</p>
+              </div>
+              <span id="clarification-count" class="count-pill">0</span>
+            </div>
+            <div id="clarification-list" class="clarification-list">
+              <p class="empty-hint">Keine Rückfragen — alles klar einordenbar.</p>
+            </div>
+          </section>
+
+          <!-- Eisenhower Matrix -->
+          <section class="card matrix-card">
+            <div class="card-head">
+              <span class="step-badge">3</span>
+              <div class="card-head-text">
+                <h3>Eisenhower-Matrix <button class="tip-btn" data-tip="Benannt nach US-Präsident Eisenhower. Sortiert Aufgaben nach Dringlichkeit und Wichtigkeit in 4 Quadranten: Sofort erledigen, Einplanen, Delegieren oder bewusst Parken.">?</button></h3>
+                <p class="card-sub" id="smart-summary">Sortierung läuft …</p>
+              </div>
+            </div>
+            <div id="matrix-grid" class="matrix-grid">
+              <article class="quadrant q-do">
+                <div class="q-head">
+                  <div>
+                    <p class="q-label">Dringend + Wichtig</p>
+                    <strong>Sofort <button class="tip-btn tip-btn--sm" data-tip="Dringend UND wichtig — sofort erledigen. Z.B. Deadline heute, dringender Kundenanruf, akute Probleme.">?</button></strong>
+                  </div>
+                  <span id="count-do" class="count-pill pill-do">0</span>
+                </div>
+                <div id="quadrant-do" class="task-list"></div>
+              </article>
+              <article class="quadrant q-schedule">
+                <div class="q-head">
+                  <div>
+                    <p class="q-label">Wichtig, nicht dringend</p>
+                    <strong>Einplanen <button class="tip-btn tip-btn--sm" data-tip="Wichtig, aber nicht dringend — festen Termin einplanen. Z.B. Weiterbildung, Strategiearbeit, Vorsorge.">?</button></strong>
+                  </div>
+                  <span id="count-schedule" class="count-pill pill-schedule">0</span>
+                </div>
+                <div id="quadrant-schedule" class="task-list"></div>
+              </article>
+              <article class="quadrant q-delegate">
+                <div class="q-head">
+                  <div>
+                    <p class="q-label">Dringend, weniger wichtig</p>
+                    <strong>Delegieren <button class="tip-btn tip-btn--sm" data-tip="Dringend, aber weniger wichtig — wenn möglich abgeben. Z.B. Standardmails, Routineabfragen, einfache Erledigungen.">?</button></strong>
+                  </div>
+                  <span id="count-delegate" class="count-pill pill-delegate">0</span>
+                </div>
+                <div id="quadrant-delegate" class="task-list"></div>
+              </article>
+              <article class="quadrant q-delete">
+                <div class="q-head">
+                  <div>
+                    <p class="q-label">Weder noch</p>
+                    <strong>Parken <button class="tip-btn tip-btn--sm" data-tip="Weder dringend noch wichtig — bewusst loslassen oder auf eine Someday-Liste setzen. Nicht alles muss heute passieren.">?</button></strong>
+                  </div>
+                  <span id="count-delete" class="count-pill pill-delete">0</span>
+                </div>
+                <div id="quadrant-delete" class="task-list"></div>
+              </article>
+            </div>
+          </section>
+
+          <!-- Special Buckets -->
+          <section class="card special-card">
+            <div class="card-head">
+              <span class="step-badge">4</span>
+              <div class="card-head-text">
+                <h3>Routinen, Projekte &amp; Ideen <button class="tip-btn" data-tip="Aufgaben, die nicht in die Matrix passen: wiederkehrende Gewohnheiten, mehrstufige Vorhaben und Ideen für später.">?</button></h3>
+              </div>
+            </div>
+            <div class="buckets-row">
+              <article class="bucket bucket-routine">
+                <div class="bucket-head">
+                  <p>Routine</p>
+                  <span id="count-routine" class="count-pill">0</span>
+                </div>
+                <p class="bucket-sub">Nicht neu priorisieren <button class="tip-btn tip-btn--xs" data-tip="Wiederkehrende Gewohnheiten und tägliche Pflichten. Werden nicht neu priorisiert, sondern einfach eingeplant.">?</button></p>
+                <div id="bucket-routine" class="task-list"></div>
+              </article>
+              <article class="bucket bucket-project">
+                <div class="bucket-head">
+                  <p>Projekte</p>
+                  <span id="count-project" class="count-pill">0</span>
+                </div>
+                <p class="bucket-sub">Nur nächsten Schritt planen <button class="tip-btn tip-btn--xs" data-tip="Größere Vorhaben mit mehreren Schritten. Hier wird nur der nächste konkrete Schritt geplant, nicht das ganze Projekt.">?</button></p>
+                <div id="bucket-project" class="task-list"></div>
+              </article>
+              <article class="bucket bucket-idea">
+                <div class="bucket-head">
+                  <p>Ideenparkplatz</p>
+                  <span id="count-idea" class="count-pill">0</span>
+                </div>
+                <p class="bucket-sub">Nicht alles ist heute <button class="tip-btn tip-btn--xs" data-tip="Ideen und Nice-to-haves, die nicht heute dran sind. Hier geparkt, damit sie nicht verloren gehen.">?</button></p>
+                <div id="bucket-idea" class="task-list"></div>
+              </article>
+            </div>
+          </section>
+
+          <!-- Day Plan -->
+          <section class="card day-card">
+            <div class="card-head">
+              <span class="step-badge">5</span>
+              <div class="card-head-text">
+                <h3>Tagesstruktur <button class="tip-btn" data-tip="Automatisch generierter Zeitplan basierend auf deinen Prioritäten, verfügbaren Stunden und Energielevel. Inklusive Pausen und Übergänge.">?</button></h3>
+              </div>
+              <button class="btn-ghost" type="button" id="build-day">Aktualisieren</button>
+            </div>
+          </section>
+
+        </div><!-- /results-area -->
+
+      </main>
+    </div>
+    <div class="tip-popup" id="tip-popup" hidden></div>
+  </body>
+</html>
