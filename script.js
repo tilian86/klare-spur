@@ -1582,6 +1582,7 @@ function renderMindmap() {
 
   if (mindElixirInstance) {
     mindElixirInstance.refresh(data);
+    setTimeout(() => mindElixirInstance.toCenter(), 100);
     return;
   }
 
@@ -1612,6 +1613,7 @@ function renderMindmap() {
   });
 
   mindElixirInstance.init(data);
+  setTimeout(() => mindElixirInstance.toCenter(), 100);
 }
 
 function renderAll() {
